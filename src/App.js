@@ -1,7 +1,9 @@
-import React, { Component } from "react";
+import React, { Component, Fragment as F } from "react";
 import ApolloClient from "apollo-boost";
 import gql from "graphql-tag";
 import { ApolloProvider, Query } from "react-apollo";
+
+import Composer from "react-composer";
 
 import logo from "./logo.svg";
 import "./App.css";
@@ -27,23 +29,31 @@ const queryBaits = gql`
   }
 `;
 
-const ExchangeRates = () => (
-  <Query query={queryRates}>
-    {({ loading, error, data: rates }) => {
-      if (loading) return <p>loading</p>;
-      if (error) return <p>error</p>;
+const unwrapGqlResults = (name, result, index) => {
+  let out = result.data || {};
+  out = out[name] || [];
+  if (typeof index === "number") {
+    return out[index] || {};
+  }
+  return out;
+};
+
+const RatesAndBaits = () => (
+  <Composer
+    components={[<Query query={queryRates} />, <Query query={queryBaits} />]}
+  >
+    {([rates, baits]) => {
+      if (rates.loading && baits.loading) return <p>loading</p>;
+      if (rates.error || baits.error) return <p>error</p>;
+      const rate = unwrapGqlResults("rates", rates, 0);
+      const bait = unwrapGqlResults("baits", baits, 0);
       return (
-        <Query query={queryBaits}>
-          {({ loading, error, data: baits }) => {
-            if (loading) return <p>loading</p>;
-            if (error) return <p>error</p>;
-            console.log(rates, baits);
-            return <p>d</p>;
-          }}
-        </Query>
+        <p>
+          {rate.currency} {bait.color}
+        </p>
       );
     }}
-  </Query>
+  </Composer>
 );
 
 class App extends Component {
@@ -51,7 +61,7 @@ class App extends Component {
     return (
       <ApolloProvider client={client}>
         <div className="App">
-          <ExchangeRates />
+          <RatesAndBaits />
         </div>
       </ApolloProvider>
     );
