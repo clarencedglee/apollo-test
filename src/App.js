@@ -1,56 +1,45 @@
 import React, { Component, Fragment as F } from "react";
 import ApolloClient from "apollo-boost";
-import gql from "graphql-tag";
-import { ApolloProvider, Query } from "react-apollo";
+import { ApolloProvider } from "react-apollo";
 
 import Composer from "react-composer";
+import { compose } from "recompose";
 
-import logo from "./logo.svg";
+import { createBait, queryBaits, queryRates } from "./gql";
+import { QueryProvider, MutationProvider } from "./utils";
+import { WithLoading } from "./loading.component";
+import { WithError } from "./error-message.component";
+import Display from "./display.component";
 import "./App.css";
 
 const client = new ApolloClient({
   uri: "https://lk4wrjkk3q.lp.gql.zone/graphql"
 });
 
-const queryRates = gql`
-  {
-    rates(currency: "USD") {
-      currency
-    }
-  }
-`;
+const Enhance = compose(WithLoading, WithError);
 
-const queryBaits = gql`
-  {
-    baits(name: "foo") {
-      name
-      color
-    }
-  }
-`;
-
-const unwrapGqlResults = (name, result, index) => {
-  let out = result.data || {};
-  out = out[name] || [];
-  if (typeof index === "number") {
-    return out[index] || {};
-  }
-  return out;
-};
+const EnhancedDisplay = Enhance(props => <Display {...props} />);
 
 const RatesAndBaits = () => (
   <Composer
-    components={[<Query query={queryRates} />, <Query query={queryBaits} />]}
+    components={[
+      QueryProvider(queryRates),
+      QueryProvider(queryBaits),
+      MutationProvider(createBait)
+    ]}
   >
-    {([rates, baits]) => {
-      if (rates.loading && baits.loading) return <p>loading</p>;
-      if (rates.error || baits.error) return <p>error</p>;
-      const rate = unwrapGqlResults("rates", rates, 0);
-      const bait = unwrapGqlResults("baits", baits, 0);
+    {([rates, baits, [createBaitFn, createBaitObj]]) => {
       return (
-        <p>
-          {rate.currency} {bait.color}
-        </p>
+        <F>
+          <EnhancedDisplay
+            loading={rates.loading || baits.loading}
+            error={rates.error || baits.error}
+            {...{ rates, baits }}
+          />
+          <button onClick={() => createBaitFn({ variables: { name: "red" } })}>
+            {createBaitObj.loading ? "Adding" : "Add"} Bait
+          </button>
+        </F>
       );
     }}
   </Composer>
